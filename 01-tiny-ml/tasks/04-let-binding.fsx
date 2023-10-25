@@ -45,14 +45,21 @@ let rec evaluate (ctx:VariableContext) e =
   // NOTE: You have the following from before
   | Unary(op, e) -> failwith "implemented in step 2"
   | If(econd, etrue, efalse) -> failwith "implemented in step 2"
-  | Lambda(v, e) -> failwith "implemented in step 3"
-  | Application(e1, e2) -> failwith "implemented in step 3"
+  | Lambda(v, e) -> ValClosure(v, e, ctx)
+  | Application(e1, e2) -> 
+      let v1 = evaluate ctx e1
+      let v2 = evaluate ctx e2
+      match v1 with
+      | ValClosure(s1, e1, ctx1) -> evaluate (Map.add s1 v2 ctx1) e1
+      | _ -> failwith "not a closure"
 
   | Let(v, e1, e2) ->
     // TODO: There are two ways to do this! A nice tricky is to 
     // treat 'let' as a syntactic sugar and transform it to the
     // 'desugared' expression and evaluating that :-)
-    failwith "not implemented"
+    let v1 = evaluate ctx e1
+    let ctx2 = Map.add v v1 ctx
+    evaluate ctx2 e2
 
 // ----------------------------------------------------------------------------
 // Test cases

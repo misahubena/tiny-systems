@@ -60,11 +60,17 @@ let rec evaluate (ctx:VariableContext) e =
 
   | Tuple(e1, e2) ->
       // TODO: Construct a tuple value here!
-      failwith "not implemented"
+      let v1 = evaluate ctx e1
+      let v2 = evaluate ctx e2
+      ValTuple(v1, v2)
   | TupleGet(b, e) ->
       // TODO: Access #1 or #2 element of a tuple value.
       // (If the argument is not a tuple, this fails.)
-      failwith "not implemented"
+      let v = evaluate ctx e
+      match b, v with
+      | true, ValTuple(v1, v2) -> v1
+      | false, ValTuple(v1, v2) -> v2
+      | _ -> failwith "not a tuple"
 
 // ----------------------------------------------------------------------------
 // Test cases

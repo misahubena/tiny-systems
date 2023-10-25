@@ -58,9 +58,18 @@ let rec evaluate (ctx:VariableContext) e =
 
   // NOTE: You have the following from before
   | Unary(op, e) -> failwith "implemented in step 2"
-  | If(econd, etrue, efalse) -> failwith "implemented in step 2"
-  | Lambda(v, e) -> failwith "implemented in step 3"
-  | Application(e1, e2) -> failwith "implemented in step 3"
+  | If(e1, e2, e3) ->
+      let v1 = evaluate ctx e1
+      match v1 with
+      | ValNum 1 -> evaluate ctx e2
+      | _ -> evaluate ctx e3
+  | Lambda(v, e) -> ValClosure(v, e, ctx)
+  | Application(e1, e2) -> 
+      let v1 = evaluate ctx e1
+      let v2 = lazy evaluate ctx e2
+      match v1 with
+      | ValClosure(s1, e1, ctx1) -> evaluate (Map.add s1 v2 ctx1) e1
+      | _ -> failwith "not a closure"
   | Let(v, e1, e2) -> failwith "implemented in step 4"
   | Tuple(e1, e2) -> failwith "implemented in step 5"
   | TupleGet(b, e) -> failwith "implemented in step 5"
@@ -71,7 +80,8 @@ let rec evaluate (ctx:VariableContext) e =
       // TODO: Implement recursion for 'let rec v = e1 in e2'.
       // (In reality, this will only work if 'e1' is a function
       // but the case can be implemented without assuming that).
-      failwith "not implemented"
+      let rec ctx2 = Map.add v (lazy evaluate ctx2 e1) ctx
+      evaluate ctx2 e2
 
 // ----------------------------------------------------------------------------
 // Test cases

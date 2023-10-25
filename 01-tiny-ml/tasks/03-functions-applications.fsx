@@ -47,6 +47,7 @@ let rec evaluate (ctx:VariableContext) e =
           | "+" -> ValNum(n1 + n2)
           | "*" -> ValNum(n1 * n2)
           | _ -> failwith "unsupported binary operator"
+      | _ -> failwith "invalid argument"
   | Variable(v) ->
       match ctx.TryFind v with 
       | Some res -> res
@@ -58,13 +59,18 @@ let rec evaluate (ctx:VariableContext) e =
   
   | Lambda(v, e) ->
       // TODO: Evaluate a lambda - create a closure value
-      failwith "not implemented"
+      ValClosure(v, e, ctx)
 
   | Application(e1, e2) ->
       // TODO: Evaluate a function application. Recursively
       // evaluate 'e1' and 'e2'; 'e1' must evaluate to a closure.
       // You can then evaluate the closure body.
-      failwith "not implemented"
+      let v1 = evaluate ctx e1
+      let v2 = evaluate ctx e2
+      match v1 with
+      | ValClosure(s1, e1, ctx1) -> evaluate (Map.add s1 v2 ctx1) e1
+      | _ -> failwith "not a closure"
+
 
 // ----------------------------------------------------------------------------
 // Test cases
