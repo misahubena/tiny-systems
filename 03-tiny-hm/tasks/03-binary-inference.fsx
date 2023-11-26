@@ -21,15 +21,33 @@ type Type =
 // Constraint solving
 // ----------------------------------------------------------------------------
 
-let rec occursCheck vcheck ty = 
-  failwith "implemented in step 2"
-let rec substType (subst:Map<_, _>) t1 = 
-  failwith "implemented in step 2"
-let substConstrs subst cs = 
-  failwith "implemented in step 2"
+let rec occursCheck vcheck ty =
+  match ty with
+  | TyVariable(v) -> v = vcheck
+  | TyList(t) -> occursCheck vcheck t
+  | _ -> false
  
-let rec solve constraints =
-  failwith "implemente in step 2"
+let rec substType (subst:Map<string, Type>) ty = 
+  match ty with
+  | TyVariable(v) when subst.ContainsKey(v) -> subst.[v]
+  | TyList(t) -> TyList(substType subst t)
+  | t -> t
+let substConstrs (subst:Map<string, Type>) (cs:list<Type * Type>) = 
+  cs |> List.map(fun (t1, t2) -> (substType subst t1, substType subst t2))
+ 
+
+let rec solve cs =
+  match cs with 
+  | [] -> []
+  | (TyNumber, TyNumber)::cs | (TyBool, TyBool)::cs -> solve cs
+  | (TyList(list1), TyList(list2))::cs -> solve ((list1, list2)::cs)
+  | (t, TyVariable(v))::cs | (TyVariable(v), t)::cs ->
+    if occursCheck v t then failwith "Cannot be solved (occurs check)"
+    let cs = substConstrs (Map.ofList [v, t]) cs
+    let subst = solve cs
+    let t = substType (Map.ofList subst) t
+    (v, t)::subst
+  | _ -> failwith "Cannot be solved"
 
 // ----------------------------------------------------------------------------
 // Constraint generation & inference
@@ -55,20 +73,25 @@ let rec generate (ctx:TypingContext) e =
 
   | Binary("=", e1, e2) ->
       // TODO: Similar to the case for '+' but returns 'TyBool'
-      failwith "not implemented"
+      let t1, s1 = generate ctx e1
+      let t2, s2 = generate ctx e2
+      TyBool, s1 @ s2 @ [ t1, TyNumber; t2, TyNumber ]
 
   | Binary(op, _, _) ->
       failwithf "Binary operator '%s' not supported." op
 
   | Variable v -> 
       // TODO: Just get the type of the variable from 'ctx' here.
-      failwith "not implemented"
+      if ctx.ContainsKey(v) then ctx.[v], [] else failwith "Cannot be generated" 
 
   | If(econd, etrue, efalse) ->
       // TODO: Call generate recursively on all three sub-expressions,
       // collect all constraints and add a constraint that (i) the type
       // of 'econd' is 'TyBool' and (ii) types of 'etrue' and 'efalse' match.
-      failwith "not implemented"
+      let t1, s1 = generate ctx econd
+      let t2, s2 = generate ctx etrue
+      let t3, s3 = generate ctx efalse
+      t2, s1 @ s2 @ s3 @ [t1, TyBool; t2, t3]
 
 
 // ----------------------------------------------------------------------------
