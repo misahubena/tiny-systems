@@ -66,7 +66,7 @@ let runInput state (line, cmd) =
 let runInputs state cmds =
   // TODO: Apply all the specified commands to the program state using 'runInput'.
   // This is a one-liner if you use 'List.fold' which has the following type:
-  //   ('State -> 'T -> 'State) -> 'State -> list<'T>
+  //   ('State -> 'T -> 'State) -> 'State -> list<'T> -> 'State
   failwith "not implemented" 
 
 // ----------------------------------------------------------------------------
