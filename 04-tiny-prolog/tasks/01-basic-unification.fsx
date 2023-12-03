@@ -44,14 +44,14 @@ let rec unifyLists l1 l2 : option<list<string * Term>> =
     // TODO: Lists cannot be unified 
     failwith "not implemented"
 
-and unify t1 t2 = 
+and unify t1 t2 : option<list<string * Term>> = 
   match t1, t2 with 
   | _ ->
       // TODO: Add all the necessary cases here!
       // * For matching atoms, return empty substitution
       // * For matching predicates, return the result of 'unifyLists'
       // * For variable and any term, return a new substitution
-      // * For anything else, return None (failed to unify)
+      // * For anything else, return None (failed to unify) 
       failwith "not implemented"
 
 // ----------------------------------------------------------------------------

@@ -22,8 +22,8 @@ let rule p b = { Head = p; Body = b }
 // ----------------------------------------------------------------------------
 
 let rec substitute (subst:Map<string, Term>) term = 
-  // TODO: Replace all variables that appear in 'subst'
-  // with the replacement specified by 'subst.[var]'.
+  // TODO: Replace variables in 'term' for which there is a
+  // replacement specified by 'subst.[var]' with the replacement.
   // You can assume the terms in 'subst' do not contain
   // any of the variables that we want to replace.
   failwith "not implemented"
@@ -37,7 +37,7 @@ let substituteSubst (newSubst:Map<string, Term>) (subst:list<string * Term>) =
   failwith "not implemented"
 
 
-let substituteTerms subst (terms:list<Term>) = 
+let substituteTerms (subst:Map<string, Term>) (terms:list<Term>) = 
   // TODO: Apply substitution 'subst' to all the terms in 'terms'
   failwith "not implemented"
 
