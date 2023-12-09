@@ -26,8 +26,8 @@ module Map =
     m1 |> Seq.fold (fun st (KeyValue(k, v)) -> Map.add k v st) m2
 
 let rec substitute (subst:Map<string, Term>) term = 
-  // TODO: Replace all variables that appear in 'subst'
-  // with the replacement specified by 'subst.[var]'.
+  // TODO: Replace variables in 'term' for which there is a
+  // replacement specified by 'subst.[var]' with the replacement.
   // You can assume the terms in 'subst' do not contain
   // any of the variables that we want to replace.
   match term with

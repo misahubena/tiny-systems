@@ -89,7 +89,6 @@ let runInputs state cmds =
   // This is a one-liner if you use 'List.fold' which has the following type:
   //   ('State -> 'T -> 'State) -> 'State -> list<'T>
   (state, cmds) ||> List.fold (fun st cmd -> { Program = runInput st cmd })
-  
 
 // ----------------------------------------------------------------------------
 // Test cases

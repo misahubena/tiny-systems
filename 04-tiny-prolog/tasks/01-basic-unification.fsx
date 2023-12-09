@@ -48,7 +48,7 @@ let rec unifyLists l1 l2 : option<list<string * Term>> =
     // TODO: Lists cannot be unified 
     None
 
-and unify t1 t2 = 
+and unify t1 t2 : option<list<string * Term>> = 
   match t1, t2 with 
       // TODO: Add all the necessary cases here!
       // * For matching atoms, return empty substitution
