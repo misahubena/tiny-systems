@@ -21,28 +21,55 @@ let rule p b = { Head = p; Body = b }
 // Substitutions and unification of terms
 // ----------------------------------------------------------------------------
 
+module Map =
+  let append (m1:Map<_,_>) m2 =
+    m1 |> Seq.fold (fun st (KeyValue(k, v)) -> Map.add k v st) m2
+
 let rec substitute (subst:Map<string, Term>) term = 
-  failwith "implemented in step 2"
+  match term with
+  | Variable(s) when subst.ContainsKey(s) -> subst.[s]
+  | Predicate(s, ts) -> Predicate(s, (substituteTerms subst ts))
+  | t -> t
 
-let substituteSubst (newSubst:Map<string, Term>) (subst:list<string * Term>) = 
-  failwith "implemented in step 2"
+and substituteTerms subst (terms:list<Term>) = 
+  match terms with
+  | t::ts -> [substitute subst t] @ (substituteTerms subst ts)
+  | [] -> []
 
-let substituteTerms subst (terms:list<Term>) = 
-  failwith "implemented in step 2"
+let rec substituteSubst (newSubst:Map<string, Term>) (subst:Map<string, Term>) = 
+  subst |> Map.map (fun k v -> substitute newSubst v)
 
 let rec unifyLists l1 l2 = 
-  failwith "implemented in steps 1 and 2"
+  match l1, l2 with 
+  | [], [] -> 
+      Some(Map.empty)
+  | h1::t1, h2::t2 -> 
+      let r1 = unify h1 h2
+      match r1 with
+      | Some(s1) ->
+        let r2 = unifyLists (substituteTerms s1 t1) (substituteTerms s1 t2)
+        match r2 with
+        | Some(s2) -> Some(Map.append (substituteSubst s2 s1) s2)
+        | _ -> None
+      | _ -> None
+  | _ -> None
 
 and unify t1 t2 = 
-  failwith "implemented in step 1"
+  match t1, t2 with
+  | Atom(s1), Atom(s2) when s1 = s2 -> Some(Map.empty)
+  | Predicate(s1, l1), Predicate(s2, l2) when s1 = s2 -> unifyLists l1 l2
+  | Variable(s), t | t, Variable(s) -> Some(Map.ofList [s, t])
+  | _, _ -> None
 
 // ----------------------------------------------------------------------------
 // Pretty printing terms
 // ----------------------------------------------------------------------------
 
 let rec (|Number|_|) term = 
-  failwith "implemented in step 5"
-
+  match term with
+  | Atom("zero") -> Some(0)
+  | Predicate("succ", [Number(n)]) -> Some(n + 1)
+  | _ -> None
 
 let rec (|List|_|) term : option<list<Term>> = 
   // TODO: If the term represents a list, this should return the 
@@ -50,13 +77,20 @@ let rec (|List|_|) term : option<list<Term>> =
   // If the term is 'Atom("empty")' return Some([])
   // If the term is 'Predicate("cons", [h; tl])' where 'tl' is itself
   // a term representing a list 'l', return Some(h::l).
-  failwith "not implemented"
-
+  match term with
+  | Atom("empty") -> Some([])
+  | Predicate("cons", [h; List(l)]) -> Some(h::l)
+  | _ -> None
 
 let rec formatTerm term = 
   // TODO: Add a case for 'List(items)' - pretty print this as a list
-  failwith "implemented in step 5"
-
+  match term with
+  | Number n -> string n
+  | List(items) -> "[" + (String.concat ", " (items |> List.map formatTerm)) + "]"
+  | Atom s -> s
+  | Variable v -> v
+  | Predicate(p, items) -> p + "(" + (String.concat ", " (items |> List.map formatTerm)) + ")"
+  
 // ----------------------------------------------------------------------------
 // Searching the program (database) and variable renaming
 // ----------------------------------------------------------------------------
@@ -66,35 +100,60 @@ let nextNumber =
   fun () -> n <- n + 1; n
 
 let rec freeVariables term = 
-  failwith "implemented in step 3"
+  match term with
+  | Variable(s) -> [s]
+  | Predicate(s, ts) -> ts |> List.collect (fun t -> freeVariables t)
+  | _ -> []
 
 let withFreshVariables (clause:Clause) : Clause =
-  failwith "implemented in step 3"
+  let vars = clause.Body |> List.collect freeVariables
+  let dl = List.distinct (freeVariables clause.Head) @ vars
+  let n = nextNumber()
+  let subst = Map.ofList (dl |> List.map (fun v -> (v, Variable(sprintf "%s%i" v n))))
+  { Head = (substitute subst clause.Head); Body = (substituteTerms subst clause.Body) }
 
-let query (program:list<Clause>) (query:Term) =
-  failwith "implemented in step 3"
+let query (program:list<Clause>) (query:Term) 
+    : list<Clause * Map<string, Term>> =
+  program |> List.choose (fun clause ->
+    let clause = withFreshVariables clause
+    let res = unify clause.Head query
+    match res with
+    | Some(subst) -> Some(clause, subst)
+    | _ -> None  
+  )
 
-
-let rec solve program subst goals : seq<list<string * Term>> = seq {
+let rec solve program subst goals : seq<Map<string, Term>> = seq {
   // TODO: We want to change this function to return a lazy sequence
   // of all possible substitutions solving the problem. I already 
   // wrapped the code in 'seq { .. }' block for you. Change the rest
   // to recursively call 'solve' using 'yield!' and return new 
   // solutions using 'yield' (replacing the printing code).
-  failwith "not implemented" 
+  match goals with 
+  | g::goals -> 
+      let matches = query program g
+      for clause, newSubst in matches do
+        let newGoals = goals @ clause.Body
+        let subst = Map.append (substituteSubst newSubst subst) newSubst
+        let newGoals = substituteTerms newSubst newGoals
+        yield! solve program subst newGoals
+  | [] -> yield subst
 }
-
 
 let run program query = 
   let vars = Set.ofSeq (freeVariables query)
-  for subst in solve program [] [query] do
+  for subst in solve program Map.empty [query] do
     // TODO: To avoid cluttered output, we want to only print assignment
     // for variables that appear in the original query (and skip all 
     // variables generated by the various internal matches). You can do
     // this here by iterating over variables and printing them only if
     // they are included in 'vars' (test using 'vars.Contains')
-    failwith "not implemented"
-  
+    subst
+    |> Map.filter (fun var term -> vars.Contains var)
+    |> Map.map (fun var term -> sprintf "%s = %s" var (formatTerm term))
+    |> Map.values
+    |> String.concat ",\n"
+    |> printfn "%s;"
+
 
 // ----------------------------------------------------------------------------
 // Querying the British royal family 
@@ -124,7 +183,10 @@ run family (Predicate("father", [Variable("X"); Variable("Y")]))
 // ----------------------------------------------------------------------------
 
 // Helper that generates a term representing a number
-let rec num n = failwith "implemented in step 5"
+let rec num n =
+  match n with
+  | 0 -> Atom("zero")
+  | n -> Predicate("succ", [num (n-1)])
 
 // Addition and equality testing for Peano arithmetic
 // $ add(zero, X, X)
@@ -153,8 +215,9 @@ let rec makeList l : Term =
   // TODO: Write a helper that generates a term representing a list.
   // This should return Atom("empty") when 'l' is [] and otherwise
   // cons(t1, .. cons(tN, empty)) when 'l' is [t1; ...; tN]
-  failwith "not implemented"
-
+  match l with
+  | [] -> Atom("empty")
+  | t::rest -> Predicate("cons", [t; (makeList rest)])
 
 // TinyProlog code to represent 'append' operation on lists
 // $ append([X|Y],Z,[X|W]) :- append(Y,Z,W).

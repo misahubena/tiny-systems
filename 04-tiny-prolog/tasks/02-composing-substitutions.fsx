@@ -21,26 +21,32 @@ let rule p b = { Head = p; Body = b }
 // Substitutions and unification of terms
 // ----------------------------------------------------------------------------
 
+module Map =
+  let append (m1:Map<_,_>) m2 =
+    m1 |> Seq.fold (fun st (KeyValue(k, v)) -> Map.add k v st) m2
+
 let rec substitute (subst:Map<string, Term>) term = 
   // TODO: Replace all variables that appear in 'subst'
   // with the replacement specified by 'subst.[var]'.
   // You can assume the terms in 'subst' do not contain
   // any of the variables that we want to replace.
-  failwith "not implemented"
+  match term with
+  | Variable(s) when subst.ContainsKey(s) -> subst.[s]
+  | Predicate(s, ts) -> Predicate(s, (substituteTerms subst ts))
+  | t -> t
 
+and substituteTerms subst (terms:list<Term>) = 
+  // TODO: Apply substitution 'subst' to all the terms in 'terms'
+  match terms with
+  | t::ts -> [substitute subst t] @ (substituteTerms subst ts)
+  | [] -> []
 
-let substituteSubst (newSubst:Map<string, Term>) (subst:list<string * Term>) = 
+let rec substituteSubst (newSubst:Map<string, Term>) (subst:Map<string, Term>) = 
   // TODO: Apply the substitution 'newSubst' to all the terms 
   // in the existing substitiution 'subst'. (We represent one 
   // as a map and the other as a list of pairs, which is a bit 
   // inelegant, but it makes calling this function easier later.)
-  failwith "not implemented"
-
-
-let substituteTerms subst (terms:list<Term>) = 
-  // TODO: Apply substitution 'subst' to all the terms in 'terms'
-  failwith "not implemented"
-
+  subst |> Map.map (fun k v -> substitute newSubst v)
 
 let rec unifyLists l1 l2 = 
   // TODO: Modify the implementation to use 'substituteTerms' and 'substituteSubst'.
@@ -53,10 +59,26 @@ let rec unifyLists l1 l2 =
   // (2) The substitution 's2' is applied to all terms in substitution 's1' before returning
   //
   // You can look at your ML type inference code. The structure is very similar! 
-  failwith "implemented in step 1"
+  match l1, l2 with 
+  | [], [] -> 
+      Some(Map.empty)
+  | h1::t1, h2::t2 -> 
+      let r1 = unify h1 h2
+      match r1 with
+      | Some(s1) ->
+        let r2 = unifyLists (substituteTerms s1 t1) (substituteTerms s1 t2)
+        match r2 with
+        | Some(s2) -> Some(Map.append (substituteSubst s2 s1) s2)
+        | _ -> None
+      | _ -> None
+  | _ -> None
 
 and unify t1 t2 = 
-  failwith "implemented in step 1"
+  match t1, t2 with
+  | Atom(s1), Atom(s2) when s1 = s2 -> Some(Map.empty)
+  | Predicate(s1, l1), Predicate(s2, l2) when s1 = s2 -> unifyLists l1 l2
+  | Variable(s), t | t, Variable(s) -> Some(Map.ofList [s, t])
+  | _, _ -> None
 
 // ----------------------------------------------------------------------------
 // Advanced unification tests requiring correct substitution
@@ -100,4 +122,3 @@ unify
   (Predicate("add", 
       [ Variable("Y"); 
         Predicate("succ", [Variable("Z")]) ]))
-
