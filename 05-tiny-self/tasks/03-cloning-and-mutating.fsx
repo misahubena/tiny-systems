@@ -67,7 +67,7 @@ let send (msg:string) (args:Objekt) (instance:Objekt) : Objekt =
 // ----------------------------------------------------------------------------
 
 let lookupSlotValue n o = 
-  match lookup o n with 
+  match lookup n o with 
   // NOTE: We ignore the object returned by 'lookup' here.
   | [ _, { Contents = it } ] -> it
   | sl -> failwithf "lookupSlotValue: Expected slot '%s' (found %d)!" n sl.Length
