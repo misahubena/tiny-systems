@@ -51,7 +51,7 @@ let expand (r1, c1) (r2, c2) (sheet:LiveSheet) =
   failwith "implemented in step 2 and 3"
 
 // ----------------------------------------------------------------------------
-// Rendering
+// Rendering sheets as HTML
 // ----------------------------------------------------------------------------
 
 open System.IO
