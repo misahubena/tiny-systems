@@ -36,16 +36,27 @@ let makeNativeMethod f =
   makeObject [] (makeSpecialObject [] (Native(f)))
 
 // NOTE: Implemented in step #2
-let addSlot n contents obj = failwith "Implemented in step 2"
-let addParentSlot n contents obj = failwith "Implemented in step 2"
-let cloneObject obj = failwith "Implemented in step 2"
+let addSlot (n:string) (contents:Objekt) (obj:Objekt) : unit = 
+  let slot = makeSlot n contents
+  obj.Slots <- slot::obj.Slots
+
+let addParentSlot (n:string) (contents:Objekt) (obj:Objekt) : unit = 
+  let slot = makeParentSlot n contents
+  obj.Slots <- slot::obj.Slots
+
+let cloneObject (obj:Objekt) : Objekt = 
+  { Code = obj.Code; Special = obj.Special; Slots = obj.Slots }
 
 // ----------------------------------------------------------------------------
 // Lookup and message sending
 // ----------------------------------------------------------------------------
 
-let rec lookup msg obj : list<Objekt * Slot> = failwith "implemented in step 3"
-and parentLookup msg obj : list<Objekt * Slot> = failwith "implemented in step 2"
+let rec lookup msg obj =
+  let slot = obj.Slots |> List.filter (fun s -> s.Name = msg) |> List.map (fun s -> (obj, s))
+  if List.isEmpty slot then parentLookup msg obj else slot
+and parentLookup msg obj =
+  let parents = obj.Slots |> List.filter(fun s -> s.IsParent)
+  ([], parents) ||> List.fold (fun res p -> res @ (lookup msg p.Contents))
 
 // TODO: If 'slotValue' has some non-native 'Code', we want to evaluate it.
 // But it will be easier to add this later, so copy code from step 3 and then
@@ -57,9 +68,20 @@ and parentLookup msg obj : list<Objekt * Slot> = failwith "implemented in step 2
 // slot and pass the as argument when calling 'eval'.
 // (to call 'send', you will need to use 'let rec .. and ..' here)
 let eval (slotValue:Objekt) (args:Objekt) (instance:Objekt) =
-  failwith "to be modified"
+  match slotValue with
+  | { Code = None } -> slotValue
+  | { Code = Some({Special = Some(Native f)}) } ->
+    let clone = cloneObject slotValue
+    addParentSlot "self*" instance clone
+    addParentSlot "args" args clone
+    f clone
+  | _ -> failwith "not implemented: non-special Code"
 let send (msg:string) (args:Objekt) (instance:Objekt) : Objekt =
-  failwith "implemented in step 3"
+  let slots = lookup msg instance
+  match slots with
+  | [_, slot] -> eval slot.Contents args instance
+  | [] -> failwith "no slot with such name"
+  | _ -> failwith "more than one slot with such name"
 
 // ----------------------------------------------------------------------------
 // Helpers for testing & object construction
@@ -77,20 +99,60 @@ let getStringValue o =
   | _ -> failwith "not a string value"
 
 // NOTE: Implemented in step #2
-let empty = failwith "implemented in step 2"
-let printCode = failwith<Objekt> "implemented in step 2"
-let stringPrototype = failwith<Objekt> "implemented in step 2"
-let makeString s = failwith "implemented in step 2"
+let empty : Objekt = makeDataObject []
+
+let printCode = makeNativeMethod (fun arcd ->
+  printfn "%s" (getStringValue arcd)
+  empty
+)
+let stringPrototype = makeDataObject [
+  makeSlot "print" printCode  
+]
+let makeString s = 
+  makeDataObject [ 
+    makeSlot "value" (makeSpecialObject [] (String s)) 
+    makeParentSlot "parent*" stringPrototype
+  ]
 
 // ----------------------------------------------------------------------------
 // Cloning and assignments
 // ----------------------------------------------------------------------------
 
-let cloneMethod = failwith<Objekt> "implemented in step 3"
-let clonablePrototype = failwith<Objekt> "implemented in step 3"
+let cloneMethod = makeNativeMethod (fun arcd -> 
+  // TODO: The activation record contains a slot 'self*' which is the
+  // target object. Use lookup to get it, clone it & retrn it!
+  // (If the lookup returns a wrong thing, fail - that's wrong.)
+    let slots = lookup "self*" arcd
+    match slots with
+    | [(o, _)] -> cloneObject o
+    | [] -> failwith "no self* slot"
+    | _ -> failwith "more than one self* slot"
+  )
 
-let assignmentMethod n = failwith "implemented in step 3"
-let makeAssignmentSlot n = failwith "implemented in step 3"
+let clonablePrototype = 
+  // TODO: Create an object that has the 'clone' method
+  makeDataObject [
+    makeSlot "clone" cloneMethod 
+  ]
+
+let assignmentMethod n = makeNativeMethod (fun arcd -> 
+  // TODO: The activation record has a slot named 'n' somewhere in its
+  // inheritance graph and a slot 'new' which is a method argument.
+  // Find those two using 'lookup' and modify the slot value (in the 
+  // that contained it - as returned from lookup). (Tiny)Self assignment 
+  // should return the object that has been modified.
+    let slots = lookup n arcd
+    let args = lookup "new" arcd
+    match slots, args with
+    | [(obj, _)], [(_, arg)] ->
+      obj.Slots <- (List.map (fun s -> if s.Name = n then {s with Contents = arg.Contents} else s) obj.Slots)
+      obj
+    | _ -> failwith "failed lookup of one or both slots"
+  )
+
+// Creates an assignment slot for a slot named 'n'
+let makeAssignmentSlot n = 
+  { Name = n + ":"; Contents = assignmentMethod n; IsParent = false }
 
 // ----------------------------------------------------------------------------
 // TinySelf code representation & interpreter
@@ -114,7 +176,11 @@ let makeAssignmentSlot n = failwith "implemented in step 3"
 // which is the activation record for the 'eval' call. But this in turn 
 // contains activation record 'activation' which is the activation record
 // for the message send that our interpreter is handling!
-let exprSelf = failwith<Objekt> "not implemented"
+let exprSelf = makeNativeMethod (fun arcd -> 
+    match lookup "activation" arcd with
+    | [(obj, _)] -> obj
+    | _ -> failwith "activation slot not found"
+  )
   
 // DEMO: 'string' expression stores the string value in a slot 'str'. When 
 // evaluated, it fetches 'str' (slot value) from the activation record.
@@ -138,7 +204,14 @@ let exprSend msg rcv = makeDataObject [
     //   and evaluate it by send it 'eval' with the data object 
     //   (containing 'activation') as argument
     // * Send 'msg' to the recursively evaluated receiver object!
-    failwith "not implemented"
+    let activation = lookup "activation" arcd
+    let msg = lookup "msg" arcd
+    let receiver = lookup "receiver" arcd
+    match activation, msg, receiver with
+    | [(_, acts)], [(msgo, _)], [(rcvo, _)] -> 
+        let obj = makeDataObject [acts]
+        send "eval" 
+    | _ -> failwith "activation slot, msg slot or receiver slot not found"
   )) ]
 
 // ----------------------------------------------------------------------------
