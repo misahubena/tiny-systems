@@ -1,7 +1,7 @@
 Write your own tiny programming system(s)!
 ==========================================
 
-This repository contains the source code for the tasks for my course **Write your own tiny programming system(s)!**. You can find more information about the course on [the official course page](https://d3s.mff.cuni.cz/teaching/nprg077/) (including links to slides and video recordings). The associated slides live in my [Teaching repository](https://github.com/tpetricek/Teaching/).
+This repository contains my solutions of the tasks from Tomáš Petříček's course **Write your own tiny programming system(s)!**. You can find the source code for the tasks [here](https://github.com/tpetricek/tiny-systems). You can find more information about the course on [the official course page](https://d3s.mff.cuni.cz/teaching/nprg077/) (including links to slides and video recordings). The associated slides live in [Teaching repository](https://github.com/tpetricek/Teaching/).
 
 Sample tiny systems
 -------------------
