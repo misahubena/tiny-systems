@@ -39,7 +39,23 @@ let rec eval (sheet:Sheet) expr =
   // * Reference to a cell that is not in 'sheet' should evaluate to Error.
   // * To evaluat Reference, get the expression from the cell and evaluate that.
   //   (we will replace this with incremental event-based code later)
-  failwith "not implemented!"
+  match expr with
+  | Const(v) -> v
+  | Reference(a) ->
+    if (Map.containsKey a sheet)
+    then eval sheet sheet[a]
+    else Error("Missing value")
+  | Function("+", a::b::[]) ->
+    match eval sheet a, eval sheet b with
+    | Number(x), Number(y) -> Number(x + y)
+    | Error(s),_ | _, Error(s) -> Error(s)
+    | _ -> Error("Invalid function arguments")
+  | Function("*", a::b::[]) ->
+    match eval sheet a, eval sheet b with
+    | Number(x), Number(y) -> Number(x * y)
+    | Error(s),_ | _, Error(s) -> Error(s)
+    | _ -> Error("Invalid function arguments")
+  | _ -> Error("Unknown function")
 
 
 
@@ -52,7 +68,7 @@ let addr (s:string) =
   // this will always be one letter followed by a number. You can access 
   // characters using "Hello".[2], convert them to integer using 'int' 
   // (int 'A' returns 65, but int "123" parses the string and returns 123).
-  failwith "not implemented!"
+  Address(int(s.[0]) - 64, int(s.[1..]))
 
 
 let fib =  

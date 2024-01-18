@@ -26,7 +26,10 @@ let rec relocateReferences (srcCol, srcRow) (tgtCol, tgtRow) (srcExpr:Expr) =
   // to address (tgtRow, tgtCol). So for example, if a formula 'A1+A2' is
   // moved from 'A3' to 'B10' then it should change to 'B8+B9' (address
   // is incremented by column difference 1 and row difference 7)
-  failwith "not implemented!"
+  match srcExpr with
+  | Const(v) -> Const(v)
+  | Reference((a, b)) -> Reference(a + tgtCol - srcCol, b + tgtRow - srcRow)
+  | Function(s, es) -> Function(s, es |> List.map(fun e -> relocateReferences (srcCol, srcRow) (tgtCol, tgtRow) e))
 
 
 let expand (srcCol, srcRow) (tgtCol, tgtRow) (sheet:Sheet) : Sheet = 
@@ -39,7 +42,10 @@ let expand (srcCol, srcRow) (tgtCol, tgtRow) (sheet:Sheet) : Sheet =
   // but you need to figure out the right syntax! Once you generate
   // new cells, you can add them to the Map using List.fold (with the 
   // sheet as the current state, updated in each step using Map.add).
-  failwith "not implemented!"
+  let srcExpr = sheet[Address(srcCol, srcRow)]
+  let cells = [for c in srcCol .. tgtCol do for r in srcRow .. tgtRow do yield Address(c, r), relocateReferences (srcCol, srcRow) (c, r) srcExpr]
+  (sheet, cells) ||> List.fold(fun s (a, c) -> s |> Map.add a c)
+
 
 
 // ----------------------------------------------------------------------------
@@ -47,7 +53,23 @@ let expand (srcCol, srcRow) (tgtCol, tgtRow) (sheet:Sheet) : Sheet =
 // ----------------------------------------------------------------------------
 
 let rec eval (sheet:Sheet) expr = 
-  failwith "implemented in step 1"
+  match expr with
+  | Const(v) -> v
+  | Reference(a) ->
+    if (Map.containsKey a sheet)
+    then eval sheet sheet[a]
+    else Error("Missing value")
+  | Function("+", a::b::[]) ->
+    match eval sheet a, eval sheet b with
+    | Number(x), Number(y) -> Number(x + y)
+    | Error(s),_ | _, Error(s) -> Error(s)
+    | _ -> Error("Invalid function arguments")
+  | Function("*", a::b::[]) ->
+    match eval sheet a, eval sheet b with
+    | Number(x), Number(y) -> Number(x * y)
+    | Error(s),_ | _, Error(s) -> Error(s)
+    | _ -> Error("Invalid function arguments")
+  | _ -> Error("Unknown function")
 
 
 // ----------------------------------------------------------------------------
@@ -55,7 +77,7 @@ let rec eval (sheet:Sheet) expr =
 // ----------------------------------------------------------------------------
 
 let addr (s:string) = 
-  failwith "implemented in step 1"
+  Address(int(s.[0]) - 64, int(s.[1..]))
 
 
 let fib =  

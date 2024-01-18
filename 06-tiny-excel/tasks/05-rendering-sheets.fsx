@@ -26,29 +26,62 @@ type LiveSheet = Map<Address, CellNode>
 // ----------------------------------------------------------------------------
 
 let rec eval (sheet:LiveSheet) expr = 
-  failwith "implemented in step 1 and 3"
+  match expr with
+  | Const(v) -> v
+  | Reference(a) ->
+    if (Map.containsKey a sheet)
+    then sheet[a].Value
+    else Error("Missing value")
+  | Function(op, a::b::[]) ->
+    match eval sheet a, eval sheet b with
+    | Number(x), Number(y) ->
+      match op with
+      | "+" -> Number(x + y)
+      | "-" -> Number(x - y)
+      | "*" -> Number(x * y)
+      | "/" -> Number(x / y)
+      | _ -> Error("Unknown function")
+    | Error(s),_ | _, Error(s) -> Error(s)
+    | _ -> Error("Invalid function arguments")
+  | _ -> Error("Unknown function")
 
 let rec collectReferences expr = 
-  failwith "implemented in step 4"
+  match expr with
+  | Function(_, es) -> es |> List.collect (fun e -> collectReferences e)
+  | Reference(a) -> [a]
+  | _ -> []
 
 let makeNode addr (sheet:LiveSheet) expr = 
-  failwith "implemented in step 3 and 4"
+  let e = Event<unit>()
+  let node = { Value = eval sheet expr; Expr = expr; Updated = e}
+  let update () = node.Value <- eval sheet expr; node.Updated.Trigger()
+  let refs = collectReferences expr
+  refs |> List.iter(fun a -> sheet[a].Updated.Publish.Add(update))
+  node
 
 let updateNode addr (sheet:LiveSheet) expr = 
-  failwith "implemented in step 4"
+  let node = sheet[addr]
+  node.Expr <- expr
+  node.Value <- eval sheet node.Expr
+  node.Updated.Trigger()
 
 let makeSheet list = 
-  failwith "implemented in step 3"
+  (Map.empty, list) ||> List.fold(fun s (a, e) -> s |> Map.add a (makeNode a s e))
 
 // ----------------------------------------------------------------------------
 // Drag down expansion
 // ----------------------------------------------------------------------------
 
 let rec relocateReferences (srcCol, srcRow) (tgtCol, tgtRow) (srcExpr:Expr) = 
-  failwith "implemented in step 2"
+  match srcExpr with
+  | Const(v) -> Const(v)
+  | Reference((a, b)) -> Reference(a + tgtCol - srcCol, b + tgtRow - srcRow)
+  | Function(s, es) -> Function(s, es |> List.map(fun e -> relocateReferences (srcCol, srcRow) (tgtCol, tgtRow) e))
 
-let expand (r1, c1) (r2, c2) (sheet:LiveSheet) = 
-  failwith "implemented in step 2 and 3"
+let expand (c1, r1) (c2, r2) (sheet:LiveSheet) = 
+  let srcExpr = sheet[Address(c1, r1)].Expr
+  let cells = [for c in c1 .. c2 do for r in r1 .. r2 do yield Address(c, r), relocateReferences (c1, r1) (c, r) srcExpr]
+  (sheet, cells) ||> List.fold(fun s (a, c) -> s |> Map.add a (makeNode a s c))
 
 // ----------------------------------------------------------------------------
 // Rendering sheets as HTML
@@ -60,12 +93,15 @@ open System.Diagnostics
 let displayValue (v:Value) : string =
   // TODO: Turn the given value into a string representing HTML
   // You can use the following to create an error string in red.
-  "<span class='e'>not implemented</span>"
+  match v with
+  | Number(n) -> $"<span>{n}</span>"
+  | String(s) -> $"<span>{s}</span>"
+  | Error(s) -> $"<span class='e'>{s}</span>"
   
 let display (sheet:LiveSheet) = 
   // TODO: Find the greates row and column index
-  let maxCol = 10 
-  let maxRow = 10 
+  let maxCol = (0, sheet) ||> Map.fold(fun s (c, r) v -> max s c)
+  let maxRow = (0, sheet) ||> Map.fold(fun s (c, r) v -> max s r)
 
   let f = Path.GetTempFileName() + ".html"
   use wr = new StreamWriter(File.OpenWrite(f))
@@ -81,18 +117,20 @@ let display (sheet:LiveSheet) =
   // TODO: Write column headings
   wr.Write("<tr><th></th>")
   for col in 1 .. maxCol do 
-    wr.Write("<th> ?? </th>")
+    wr.Write($"<th>{char(64 + col)}</th>")
   wr.Write("</tr>")
 
   // TODO: Write row headings and data
   for row in 1 .. maxRow do 
-    wr.Write($"<tr><th> ?? </th>")
+    wr.Write($"<tr><th>{row}</th>")
     for col in 1 .. maxCol do 
-      wr.Write("<td> !! </td>")
+      if Map.containsKey (col, row) sheet
+      then wr.Write($"<td>{displayValue sheet[(col, row)].Value}</td>")
+      else wr.Write("<td></td>")
     wr.Write("</tr>")
   wr.Write("</table></body></html>")
   wr.Close()
-  Process.Start(f)
+  //Process.Start(f)
 
 
 // ----------------------------------------------------------------------------
@@ -100,7 +138,7 @@ let display (sheet:LiveSheet) =
 // ----------------------------------------------------------------------------
 
 let addr (s:string) = 
-  failwith "implemented in step 1"
+  Address(int(s.[0]) - 64, int(s.[1..]))
 
 // NOTE: Let's visualize the Fibbonacci spreadsheet from Step 2!
 let fib =  
@@ -134,6 +172,11 @@ let tempConv =
         Const(Number 9) ]) 
     addr "A2", Const(String "C to F")
     addr "B2", Const(Number 0) 
-    addr "C2", Const(Error "implemented in step 4") ]
+    addr "C2",
+      Function("+", [ 
+        Function("/", [ 
+          Function("*", [ Reference(addr "B2"); Const(Number 9) ])
+          Const(Number 5) ])
+        Const(Number 32) ])]
   |> makeSheet
 display tempConv
